@@ -4,7 +4,6 @@ module.exports = {
     update: async (req, res) => {
 
         const body = req.body;
-        const ids = body.map(item => item.productId);
         let productObj = {};
         body.forEach(element => {
             productObj[element.productId] = {
@@ -12,29 +11,27 @@ module.exports = {
                 operation: element.operation
             }
         });
+        let ops = [];
         try {
             for (let id in productObj) {
                 if (productObj[id].operation === 'add') {
-                    await Product.updateOne({
-                        productId: id
-                    },
-                        {
-                            $inc: {
-                                quantity: productObj[id].quantity
-                            }
-                        })
-                } else {
-                    await Product.updateOne({
-                        productId: id
-                    },
-                        {
-                            $inc: {
-                                quantity: -Math.abs(productObj[id].quantity)
-                            }
-                        })
+                    ops.push({
+                        updateOne: {
+                            "filter": { productId: id },
+                            "update": { $inc: { quantity: productObj[id].quantity } }
+                        }
+                    });
+                } else if (productObj[id].operation === 'subtract'){
+                    ops.push({
+                        updateOne: {
+                            "filter": { productId: id },
+                            "update": { $inc: { quantity: -Math.abs(productObj[id].quantity) } }
+                        }
+                    });
                 }
 
             }
+            await Product.bulkWrite(ops, { ordered: false });
             return res.status(200).json()
         } catch (error) {
             console.log(error);
